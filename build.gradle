@@ -1,0 +1,59 @@
+plugins {
+	id 'java'
+	id 'org.graalvm.buildtools.native' version '0.9.23'
+	id 'me.champeau.jmh' version '0.7.1'
+}
+
+dependencies {
+	implementation('com.fasterxml.jackson.core:jackson-databind:2.15.2')
+    testImplementation('org.junit.jupiter:junit-jupiter:5.9.2')
+}
+
+repositories {
+    mavenCentral()
+}
+
+task createMeasurements(type: JavaExec) {
+	classpath sourceSets.main.runtimeClasspath
+	mainClass.set(project.findProperty("createMeasurementsClass"))
+	args(project.findProperty("inputFile"), project.findProperty("measurementsCount"))
+}
+
+task calculateAverage(type: JavaExec) {
+	classpath sourceSets.main.runtimeClasspath
+	mainClass.set(project.findProperty("calculateAverageClass"))
+	args(project.findProperty("inputFile"))
+	standardOutput = new FileOutputStream(project.findProperty("outputFile"))
+	errorOutput = new FileOutputStream(project.findProperty("errorFile"))
+	maxHeapSize("2024m")
+	doNotTrackState("app should always run")
+}
+
+task validateStatistics(type: JavaExec) {
+	classpath sourceSets.main.runtimeClasspath
+	mainClass.set(project.findProperty("validateStatisticsClass"))
+	args(project.findProperty("expectedOutputFile"), project.findProperty("actualOutputFile"))
+}
+
+graalvmNative {
+	binaries {
+		main {
+			mainClass.set(project.findProperty("calculateAverageClass"))
+			runtimeArgs(project.findProperty("inputFile"))
+		}
+	}
+}
+
+test {
+	useJUnitPlatform()
+	maxHeapSize = "2g"
+}
+
+jmh {
+	includes = [ 'TrimBenchmark' ]
+	fork = 1
+	warmupIterations = 4
+	warmup = '5s'
+	iterations = 4
+	timeOnIteration = '10s'
+}
