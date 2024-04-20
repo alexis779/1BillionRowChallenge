@@ -1,6 +1,6 @@
 package dev.morling.onebrc.calculate;
 
-import dev.morling.onebrc.model.StationHashKey;
+import dev.morling.onebrc.model.StationKey;
 import dev.morling.onebrc.model.StationStatistics;
 
 import java.io.OutputStream;
@@ -17,7 +17,7 @@ public class StationWriter {
      */
     private static final int FRACTIONS = 10;
 
-    public void printStations(final Map<StationHashKey, StationStatistics> stationMap, final OutputStream outputStream) {
+    public void printStations(final Map<StationKey, StationStatistics> stationMap, final OutputStream outputStream) {
         try (PrintWriter printWriter = new PrintWriter(outputStream)) {
             printWriter.print("{");
 

@@ -13,16 +13,17 @@ public class CalculateAverage {
         final File file = new File(fileName);
         final OutputStream outputStream = System.out;
 
-        new CalculateAverage()
-                .run(file, outputStream);
+        final CalculateAverage calculateAverage = new CalculateAverage();
+        calculateAverage.parse(file, outputStream);
     }
 
-    public void run(final File file, final OutputStream outputStream) throws IOException {
-        final StationInput input = new StationInput(file);
-        final StationFileParser stationFileParser = new StationFileParser2();
-        final StationOutput output = stationFileParser.parse(input);
+    public void parse(final File file, final OutputStream outputStream) throws IOException {
+        final StationFileParser stationFileParser = new MMapConcurrentParser(1);
+
+        final StationInput stationInput = new StationInput(file);
+        final StationOutput stationOutput = stationFileParser.parse(stationInput);
 
         final StationWriter stationWriter = new StationWriter();
-        stationWriter.printStations(output.stationsMap(), outputStream);
+        stationWriter.printStations(stationOutput.stationsMap(), outputStream);
     }
 }

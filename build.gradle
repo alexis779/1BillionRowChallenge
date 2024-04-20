@@ -15,45 +15,46 @@ repositories {
 
 task createMeasurements(type: JavaExec) {
 	classpath sourceSets.main.runtimeClasspath
-	mainClass.set(project.findProperty("createMeasurementsClass"))
-	args(project.findProperty("inputFile"), project.findProperty("measurementsCount"))
+	mainClass.set(findProperty("createMeasurements.class"))
+	args(
+		findProperty("createMeasurements.inputFile"),
+		findProperty("createMeasurements.count"),
+		findProperty("createMeasurements.outputFile"))
 }
 
 task calculateAverage(type: JavaExec) {
 	classpath sourceSets.main.runtimeClasspath
-	mainClass.set(project.findProperty("calculateAverageClass"))
-	args(project.findProperty("inputFile"))
-	standardOutput = new FileOutputStream(project.findProperty("outputFile"))
-	errorOutput = new FileOutputStream(project.findProperty("errorFile"))
-	maxHeapSize("2024m")
+	mainClass.set(findProperty("calculateAverage.class"))
+
+	def asyncProfilerPath = findProperty("asyncProfiler.path")
+	def asyncProfilerAgent = "-agentpath:${asyncProfilerPath}=start,event=cpu,file=flamegraph.html"
+	jvmArgs(asyncProfilerAgent)
+
+	args(findProperty("createMeasurements.outputFile"))
+	standardOutput = new FileOutputStream(findProperty("calculateAverage.outputFile"))
+	errorOutput = new FileOutputStream(findProperty("calculateAverage.errorFile"))
 	doNotTrackState("app should always run")
 }
 
 task validateStatistics(type: JavaExec) {
 	classpath sourceSets.main.runtimeClasspath
-	mainClass.set(project.findProperty("validateStatisticsClass"))
-	args(project.findProperty("expectedOutputFile"), project.findProperty("actualOutputFile"))
+	mainClass.set(findProperty("validateStatistics.class"))
+	args(findProperty("validateStatistics.expectedOutputFile"), findProperty("calculateAverage.outputFile"))
 }
 
 graalvmNative {
 	binaries {
 		main {
-			mainClass.set(project.findProperty("calculateAverageClass"))
-			runtimeArgs(project.findProperty("inputFile"))
+			mainClass.set(findProperty("calculateAverage.class"))
+			runtimeArgs(findProperty("createMeasurements.outputFile"))
 		}
 	}
 }
 
 test {
 	useJUnitPlatform()
-	maxHeapSize = "2g"
 }
 
 jmh {
-	includes = [ 'TrimBenchmark' ]
-	fork = 1
-	warmupIterations = 4
-	warmup = '5s'
-	iterations = 4
-	timeOnIteration = '10s'
+	includes = [ 'ComparativeBenchmark' ]
 }

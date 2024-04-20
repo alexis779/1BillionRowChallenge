@@ -1,9 +1,4 @@
-package dev.morling.onebrc.calculate;
-
-import dev.morling.onebrc.model.StationInput;
-import dev.morling.onebrc.model.StationOutput;
-import dev.morling.onebrc.model.StationSortKey;
-import dev.morling.onebrc.model.StationTemperature;
+package dev.morling.onebrc.calculate.string;
 
 import java.io.BufferedReader;
 import java.io.FileInputStream;
@@ -11,16 +6,24 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 
-public class StationFileParser1 implements StationFileParser {
-    private static final String SEPARATOR = ";";
+import dev.morling.onebrc.calculate.MapStationStatisticsAggregator;
+import dev.morling.onebrc.calculate.StationFileParser;
+import dev.morling.onebrc.calculate.StationStatisticsAggregator;
+import dev.morling.onebrc.model.StationInput;
+import dev.morling.onebrc.model.StationOutput;
+import dev.morling.onebrc.model.StationSortKey;
+import dev.morling.onebrc.model.StationTemperature;
 
-    private final StationTemperature stationTemperature = new StationTemperature();
+public abstract class AbstractStringParser implements StationFileParser {
+    protected static final String SEPARATOR = ";";
 
-    private final StationStatisticsAggregator stationStatisticsAggregator;
+    private final StationSortKey stationSortKey = new StationSortKey();
+    private final StationTemperature stationTemperature = new StationTemperature(stationSortKey);
 
-    public StationFileParser1(final StationStatisticsAggregator stationStatisticsAggregator) {
-        this.stationStatisticsAggregator = stationStatisticsAggregator;
-    }
+    private final StationStatisticsAggregator stationStatisticsAggregator = new MapStationStatisticsAggregator();
+
+    protected String name;
+    protected String temperatureString;
 
     @Override
     public StationOutput parse(final StationInput stationInput) throws IOException {
@@ -42,14 +45,17 @@ public class StationFileParser1 implements StationFileParser {
     }
 
     private void parseLine(final String line) {
-        int separatorIndex = line.indexOf(SEPARATOR);
-        final String name = line.substring(0, separatorIndex);
-        final String temperatureString = line.substring(separatorIndex + 1);
+        // store name & temperature attributes
+        loadRow(line);
+
         final double temperature = Double.parseDouble(temperatureString);
-        stationTemperature.stationHashKey(new StationSortKey(name));
+
+        stationSortKey.name(name);
         stationTemperature.temperature(temperature);
 
         // notify the callback
         stationStatisticsAggregator.addTemperature(stationTemperature);
     }
+
+    protected abstract void loadRow(final String line);
 }

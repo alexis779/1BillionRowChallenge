@@ -1,14 +1,18 @@
 package dev.morling.onebrc.calculate;
 
-import org.junit.jupiter.api.Test;
+import static dev.morling.onebrc.calculate.StationWriter.round;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import static dev.morling.onebrc.calculate.StationWriter.round;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import org.junit.jupiter.api.Test;
+
+import dev.morling.onebrc.model.StationInput;
+import dev.morling.onebrc.model.StationOutput;
 
 public class CalculateAverageTest {
 
@@ -57,11 +61,54 @@ public class CalculateAverageTest {
         final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
         new CalculateAverage()
-                .run(path.toFile(), byteArrayOutputStream);
+                .parse(path.toFile(), byteArrayOutputStream);
 
         final String station0 = "Vohipeno=-22.3/-19.7/-17.2";
         final String station1 = "Ōno=35.5/35.8/36.0";
 
         assertEquals(String.format("{%s, %s}\n", station0, station1), byteArrayOutputStream.toString());
+    }
+
+    @Test
+    public void testParsingLargeFile() throws IOException {
+        final Path path = Paths.get("data", "measurements_head.csv");
+        final File file = path.toFile();
+
+        assertEquals(163, file.length());
+        final StationInput stationInput = new StationInput(file);
+
+        final int totalSplits = 3;
+        final int bufferSize = 50;
+
+        final StationOutput bbOutput = new ByteBufferParser(bufferSize)
+            .parse(stationInput);
+        final StationOutput bbcOutput = new ByteBufferConcurrentParser(totalSplits, bufferSize)
+            .parse(stationInput);
+        assertEquals(bbOutput, bbcOutput);
+
+        final StationOutput mmOutput = new MMapParser()
+            .parse(stationInput);
+        final StationOutput mmcOutput = new MMapConcurrentParser(totalSplits, bufferSize)
+            .parse(stationInput);
+        assertEquals(mmOutput, mmcOutput);
+
+        assertEquals(bbOutput, mmOutput);
+    }
+
+    @Test
+    public void coreNumber() {
+        final int processors = Runtime.getRuntime().availableProcessors();
+        System.err.println(String.format("Number of processors %d", processors));
+    }
+
+    @Test
+    public void sampleOutput() throws IOException {
+        final Path path = Paths.get("data", "measurements_head.csv");
+        final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        new CalculateAverage()
+                .parse(path.toFile(), byteArrayOutputStream);
+
+        System.err.println(byteArrayOutputStream.toString());
     }
 }

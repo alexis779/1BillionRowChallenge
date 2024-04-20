@@ -1,20 +1,22 @@
 package dev.morling.onebrc.model;
 
 public class StationTemperature {
-    private StationHashKey stationHashKey;
+    private StationKey stationHashKey;
     private double temperature;
 
-    public StationTemperature() {
-        stationHashKey = null;
+    public StationTemperature() {}
+
+    public StationTemperature(final StationKey stationHashKey) {
+        this.stationHashKey = stationHashKey;
         temperature = 0;
     }
 
-    public StationTemperature(StationTemperature stationTemperature) {
+    public StationTemperature(final StationTemperature stationTemperature) {
         this.stationHashKey = stationTemperature.stationHashKey();
         this.temperature = stationTemperature.temperature();
     }
 
-    public StationHashKey stationHashKey() {
+    public StationKey stationHashKey() {
         return stationHashKey;
     }
 
@@ -22,7 +24,7 @@ public class StationTemperature {
         return temperature;
     }
 
-    public void stationHashKey(final StationHashKey stationHashKey) {
+    public void stationHashKey(final StationKey stationHashKey) {
         this.stationHashKey = stationHashKey;
     }
 

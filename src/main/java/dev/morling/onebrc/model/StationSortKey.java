@@ -1,8 +1,15 @@
 package dev.morling.onebrc.model;
 
-public class StationSortKey implements Comparable<StationSortKey>, StationHashKey {
+public class StationSortKey implements Comparable<StationSortKey>, StationKey {
 
-    private final String name;
+    private String name;
+
+    public StationSortKey() {
+    }
+
+    public StationSortKey(final StationSortKey stationSortKey) {
+        this(stationSortKey.name);
+    }
 
     public StationSortKey(final String name) {
         this.name = name;
@@ -10,6 +17,10 @@ public class StationSortKey implements Comparable<StationSortKey>, StationHashKe
 
     public String name() {
         return name;
+    }
+
+    public void name(final String name) {
+        this.name = name;
     }
 
     @Override
@@ -31,5 +42,10 @@ public class StationSortKey implements Comparable<StationSortKey>, StationHashKe
     @Override
     public String toString() {
         return name;
+    }
+
+    @Override
+    public StationKey duplicate() {
+        return new StationSortKey(this);
     }
 }

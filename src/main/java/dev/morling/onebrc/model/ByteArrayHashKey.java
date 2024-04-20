@@ -2,14 +2,27 @@ package dev.morling.onebrc.model;
 
 import java.util.Arrays;
 
-public class ByteArrayHashKey implements StationHashKey {
-    private final byte[] key;
-    private final int hashCode;
+public class ByteArrayHashKey implements StationKey {
+    /**
+     * 1 KB
+     */
+    private static final int LENGTH = 1024;
+
+    private byte[] key;
+    private int length;
+    private int hashCode;
     private String name;
 
-    public ByteArrayHashKey(final byte[] key) {
-        this.key = key;
-        hashCode = Arrays.hashCode(key);
+    public ByteArrayHashKey() {
+        key = new byte[LENGTH];
+    }
+
+    public ByteArrayHashKey(final ByteArrayHashKey byteArrayHashKey) {
+        key = new byte[LENGTH];
+        System.arraycopy(byteArrayHashKey.key, 0, key, 0, byteArrayHashKey.length);
+        this.length = byteArrayHashKey.length;
+        this.hashCode = byteArrayHashKey.hashCode;
+        this.name = byteArrayHashKey.name;
     }
 
     public byte[] key() {
@@ -18,7 +31,7 @@ public class ByteArrayHashKey implements StationHashKey {
 
     public String name() {
         if (name == null) {
-            name = new String(key);
+            name = new String(key, 0, length);
         }
         return name;
     }
@@ -26,7 +39,11 @@ public class ByteArrayHashKey implements StationHashKey {
     @Override
     public boolean equals(final Object object) {
         final ByteArrayHashKey stationHashKey = (ByteArrayHashKey) object;
-        return Arrays.equals(key, stationHashKey.key());
+        // Since hashCode and length should match, we can check those conditions first.
+        if (! (hashCode == stationHashKey.hashCode && length == stationHashKey.length)) {
+            return false;
+        }
+        return Arrays.equals(key, 0, length, stationHashKey.key, 0, stationHashKey.length);
     }
 
     @Override
@@ -37,5 +54,21 @@ public class ByteArrayHashKey implements StationHashKey {
     @Override
     public String toString() {
         return name();
+    }
+
+    public void hashCode(final int hashCode) {
+        this.hashCode = hashCode;
+    }
+
+    public void length(final int length) {
+        this.length =  length;
+    }
+    public void resetName() {
+        name = null;
+    }
+
+    @Override
+    public StationKey duplicate() {
+        return new ByteArrayHashKey(this);
     }
 }

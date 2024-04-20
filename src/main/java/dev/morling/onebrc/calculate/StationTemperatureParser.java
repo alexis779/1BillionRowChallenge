@@ -1,5 +1,8 @@
 package dev.morling.onebrc.calculate;
 
+import java.nio.ByteBuffer;
+
+import dev.morling.onebrc.model.BaseInteger;
 import dev.morling.onebrc.model.ByteArrayHashKey;
 import dev.morling.onebrc.model.StationTemperature;
 
@@ -12,147 +15,112 @@ public class StationTemperatureParser {
     private static final byte ZERO = (byte) '0';
 
     private static final int BASE = 10;
+    private static final int PRIME = 31;
 
-    private final StationTemperature stationTemperature = new StationTemperature();
+    private final ByteArrayHashKey byteArrayHashKey = new ByteArrayHashKey();
+    private final StationTemperature stationTemperature = new StationTemperature(byteArrayHashKey);
+    private final BaseInteger baseInteger = new BaseInteger();
 
     private final ByteBuffer byteBuffer;
     private final StationStatisticsAggregator stationStatisticsAggregator;
-    private final long end;
+
     public StationTemperatureParser(final ByteBuffer byteBuffer,
                                     final StationStatisticsAggregator stationStatisticsAggregator) {
-        this(byteBuffer, stationStatisticsAggregator, -1);
-    }
-
-    public StationTemperatureParser(final ByteBuffer byteBuffer,
-                                    final StationStatisticsAggregator stationStatisticsAggregator,
-                                    final long end) {
         this.byteBuffer = byteBuffer;
         this.stationStatisticsAggregator = stationStatisticsAggregator;
-        this.end = end;
     }
 
-    public ByteBuffer byteBuffer() {
-        return byteBuffer;
-    }
-
-    public boolean parseLines() {
-        while (byteBuffer.hasNext() && beforeEnd()) {
+    public void parseLines() {
+        while (byteBuffer.hasRemaining()) {
             parseLine();
         }
-        return beforeEnd();
-    }
-
-    private boolean beforeEnd() {
-        return end == -1 || byteBuffer.offset() < end;
     }
 
     private void parseLine() {
-        final byte[] name = scanStationName();
-        final double temperature = scanDouble();
-        stationTemperature.stationHashKey(new ByteArrayHashKey(name));
+        parseStationName();
+        stationTemperature.stationHashKey(byteArrayHashKey);
+
+        final double temperature = parseDouble();
         stationTemperature.temperature(temperature);
 
         // notify the callback
         stationStatisticsAggregator.addTemperature(stationTemperature);
     }
 
-    private byte[] scanStationName() {
+    private void parseStationName() {
         // parse station name
-        int start = byteBuffer.offset();
-        byteBuffer.scan(SEMI_COLON);
-        int length = byteBuffer.offset() - start;
-        final byte[] name = new byte[length];
-        System.arraycopy(byteBuffer.buffer(), start, name, 0, length);
-        byteBuffer.skip();
-        return name;
+        int start = byteBuffer.position();
+
+        // compute rolling hash while scanning
+        int hash = 1;
+        byte current;
+        while (byteBuffer.hasRemaining() && (current = byteBuffer.get()) != SEMI_COLON) {
+            hash = PRIME * hash + current;
+        }
+        byteArrayHashKey.hashCode(hash);
+
+        int length = byteBuffer.position()-1 - start;
+        byteArrayHashKey.length(length);
+
+        // load slice from buffer into the byte array
+        byteBuffer.get(start, byteArrayHashKey.key(), 0, length);
+
+        byteArrayHashKey.resetName();
     }
 
-    private double scanDouble() {
-        int start = byteBuffer.offset();
-        byteBuffer.scan(LINE_FEED);
-        final double temperature = parseDouble(byteBuffer.buffer(), start, byteBuffer.offset()-1);
-        byteBuffer.skip();
-        return temperature;
+    private double parseDouble() {
+        final boolean isNegative = byteBuffer.get(byteBuffer.position()) == MINUS;
+        if (isNegative) {
+            byteBuffer.get();
+        }
+
+        final double temperature = parseInt() + parseFraction();
+        return isNegative ? -temperature : temperature;
+    }
+
+    private int parseInt() {
+        parseBaseInteger();
+        return baseInteger.sum();
     }
 
     /**
-     * TODO this double string parsing suffers from precision loss.
+     * This recursive function reverts the order of the byte sequence.
+     *
+     * It needs to reduce the list of digits from lowest order first to highest order last.
+     */
+    private void parseBaseInteger() {
+        final byte current = byteBuffer.get();
+        if (current == DOT) {
+            baseInteger.power(1);
+            baseInteger.sum(0);
+            return;
+        }
+        parseBaseInteger();
+
+        final int digit = parseDigit(current);
+        baseInteger.sum(baseInteger.sum() + baseInteger.power() * digit);
+        baseInteger.power(BASE * baseInteger.power());
+    }
+
+    /**
+     * TODO: this fraction string parsing suffers from precision loss in double type.
      *
      * Rounding will fail on "-0.75" -> -0.7500000000000001 -> -0.8
      * The correct rounding for -0.75 is -0.7.
      *
-     * @param dBuffer
-     * @param start
-     * @param end
-     * @return
      */
-    public static double parseDouble(byte[] dBuffer, int start, int end) {
-        /*
-        final byte[] doubleBuffer = new byte[end+1-start];
-        System.arraycopy(dBuffer, start, doubleBuffer, 0, end+1-start);
-        return Double.parseDouble(new String(doubleBuffer));
-         */
-        if (dBuffer[start] == MINUS) {
-            return -parsePositiveDouble(dBuffer, start+1, end);
-        }
-        return parsePositiveDouble(dBuffer, start, end);
-    }
-    private static double parsePositiveDouble(byte[] dBuffer, int start, int end) {
-        int offset = start+1;
-        while (dBuffer[offset] != DOT) {
-            offset++;
-        }
-        return toDouble(dBuffer, start, offset, end);
-    }
-
-    private static double toDouble(byte[] dBuffer, int start, int offset, int end) {
-        int i = parseInt(dBuffer, start, offset-1);
-        double f = parseFraction(dBuffer, offset+1, end);
-        return i + f;
-    }
-
-    private static int parseInt(byte[] dBuffer, int start, int end) {
-        /*
-        int i = 0;
-        int pow = 1;
-        for (int digit = end; digit >= start; digit--) {
-            i += pow * parseDigit(dBuffer[digit]);
-            pow *= BASE;
-        }
-        return i;
-         */
-        if (end - start > 1) {
-            throw new RuntimeException("Int size not supported");
-        }
-
-        int digit1 = parseDigit(dBuffer[end]);
-        if (start == end) {
-            return digit1;
-        }
-
-        int digit2 = parseDigit(dBuffer[start]);
-        return BASE * digit2 + digit1;
-    }
-
-    private static double parseFraction(byte[] dBuffer, int start, int end) {
-        /*
-        double f = 0;
+    private double parseFraction() {
+        double sum = 0;
         double invPow = 1d / BASE;
-        for (int decimal = start; decimal <= end; decimal++) {
-            f += invPow * parseDigit(dBuffer[decimal]);
+        byte current;
+        while (byteBuffer.hasRemaining() && (current = byteBuffer.get()) != LINE_FEED) {
+            sum += invPow * parseDigit(current);
             invPow /= BASE;
         }
-        return f;
-
-         */
-        if (end - start > 0) {
-            throw new RuntimeException("Fraction size not supported");
-        }
-
-        return 1d * parseDigit(dBuffer[start]) / BASE;
+        return sum;
     }
 
-    private static int parseDigit(byte dByte) {
+    private int parseDigit(final byte dByte) {
         return dByte - ZERO;
     }
 }
