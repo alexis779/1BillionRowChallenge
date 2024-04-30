@@ -14,8 +14,8 @@ max_threads = 12
 total_count = 10**9
 df['throughput'] = total_count / df['Score']
 
-byte_buffer = df[df['Benchmark'] == "concurrentByteBuffer"]
-mmap = df[df['Benchmark'] == "concurrentMmap"]
+byte_buffer = df[df['Benchmark'] == "byteBuffer"]
+mmap = df[df['Benchmark'] == "mmap"]
 
 score1 = byte_buffer[byte_buffer['(concurrency)'] == 1].iloc[0]['Score']
 byte_buffer['acceleration'] = score1 / byte_buffer['Score']

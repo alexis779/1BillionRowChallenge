@@ -2,7 +2,6 @@ package dev.morling.onebrc.calculate;
 
 import java.nio.ByteBuffer;
 
-import dev.morling.onebrc.model.BaseInteger;
 import dev.morling.onebrc.model.LongArrayHashKey;
 import dev.morling.onebrc.model.StationTemperature;
 
@@ -15,11 +14,16 @@ public class StationTemperatureParser {
     private static final byte ZERO = (byte) '0';
 
     private static final int BASE = 10;
+    /**
+     * Max int is 2^31, 2 GB.
+     * So the max int number will by 2*10^9 in it's base-10 decomposition.
+     * We need a long because a first digit > 2 would overflow an int
+     */
+    private static final long MAX_POW = 1_000_000_000; // 10^9
     private static final int PRIME = 31;
 
     private final LongArrayHashKey longArrayHashKey = new LongArrayHashKey();
     private final StationTemperature stationTemperature = new StationTemperature(longArrayHashKey);
-    private final BaseInteger baseInteger = new BaseInteger();
 
     private final ByteBuffer byteBuffer;
     private final StationStatisticsAggregator stationStatisticsAggregator;
@@ -51,7 +55,7 @@ public class StationTemperatureParser {
         final int start = byteBuffer.position();
 
         // rolling hash
-        int hashCode = 1;
+        long hashCode = 1;
 
         // long buffer
         final long[] key = longArrayHashKey.key();
@@ -63,9 +67,7 @@ public class StationTemperatureParser {
         int j = 0;
 
         byte current;
-        while (byteBuffer.hasRemaining() && (current = byteBuffer.get()) != SEMI_COLON) {
-            hashCode = PRIME * hashCode + current;
-
+        while ((current = byteBuffer.get()) != SEMI_COLON) {
             // apply bit mask, since negative values will have 1's on the left of the binary representation of the byte
             final long b = current & 0xFFL;
             final int shiftBits = j * LongArrayHashKey.BITS_IN_BYTE;
@@ -74,21 +76,27 @@ public class StationTemperatureParser {
 
             if (j == LongArrayHashKey.BYTES_IN_LONG) {
                 key[longPosition++] = longCurrent;
+                hashCode = updateHashCode(hashCode, longCurrent);
                 longCurrent = 0;
                 j = 0;
             }
         }
         if (longCurrent != 0) {
             key[longPosition] = longCurrent;
+            hashCode = updateHashCode(hashCode, longCurrent);
         }
 
-        longArrayHashKey.hashCode(hashCode);
+        longArrayHashKey.hashCode((int) hashCode);
 
         final int length = byteBuffer.position()-1 - start;
         longArrayHashKey.length(length);
 
         // invalidate stale value in cache
         longArrayHashKey.resetName();
+    }
+
+    private long updateHashCode(final long hashCode, final long current) {
+        return (hashCode * PRIME + current) % Integer.MAX_VALUE;
     }
 
     private double parseDouble() {
@@ -102,27 +110,16 @@ public class StationTemperatureParser {
     }
 
     private int parseInt() {
-        parseBaseInteger();
-        return baseInteger.sum();
-    }
-
-    /**
-     * This recursive function reverts the order of the byte sequence.
-     *
-     * It needs to reduce the list of digits from lowest order first to highest order last.
-     */
-    private void parseBaseInteger() {
-        final byte current = byteBuffer.get();
-        if (current == DOT) {
-            baseInteger.power(1);
-            baseInteger.sum(0);
-            return;
+        long sum = 0;
+        long pow = MAX_POW;
+        byte current;
+        while ((current = byteBuffer.get()) != DOT) {
+            final int digit = parseDigit(current);
+            sum += digit * pow;
+            pow /= BASE;
         }
-        parseBaseInteger();
-
-        final int digit = parseDigit(current);
-        baseInteger.sum(baseInteger.sum() + baseInteger.power() * digit);
-        baseInteger.power(BASE * baseInteger.power());
+        sum /= (BASE * pow);
+        return (int) sum;
     }
 
     /**
@@ -136,6 +133,7 @@ public class StationTemperatureParser {
         double sum = 0;
         double invPow = 1d / BASE;
         byte current;
+        // need to check if buffer is full for the last line hitting the end of the stream
         while (byteBuffer.hasRemaining() && (current = byteBuffer.get()) != LINE_FEED) {
             sum += invPow * parseDigit(current);
             invPow /= BASE;

@@ -1,8 +1,12 @@
+# Introduction
+
+This [article](https://medium.com/@alexisdetrglod/1-billion-row-challenge-in-java-35414b803441) describes a performance optimization problem for a large event stream processing. Both Individual Contributors and Engineering Managers will be able to learn about the methodology, best practices and lessons learnt in order to tackle similar problems that may arise in their work environment.
+
 # Challenge
 
 The *[1 Billion row challenge](https://github.com/gunnarmorling/1brc)* consists of parsing a large csv file as fast as possible on a single host, in **Java**.
 
-Each line in the file contains a city name where a weather station is located, associated with a temperature measurement.
+Each line in the file contains a city name where the weather station is located, associated with a temperature measurement.
 
 ```
 Tokyo;35.6897
@@ -29,7 +33,7 @@ The code for the solutions is available in Github repo:
 
 > [https://github.com/alexis779/1BillionRowChallenge](https://github.com/alexis779/1BillionRowChallenge)
 
-See below the runtime comparison of the versions implemented in the project.
+Here’s the runtime comparison of the versions implemented in the project.
 
 ![Version comparison](runtime_comparison_versions.png)
 
@@ -39,6 +43,8 @@ See below the runtime comparison of the versions implemented in the project.
 | baseline| The solution proposed by the organizer|
 |split| `String.split` |
 |substring| `String.indexOf`, `String.substring` |
+|byteBuffer1| Fixed size buffer with 1 thread|
+|byteBuffer6| Fixed size buffer with 6 threads|
 |mmap1| MMap with 1 thread|
 |mmap6| MMap with 6 threads|
 
@@ -51,7 +57,7 @@ A concurrency of `6` yields a throughput multiplication factor of `5`, which is 
 
 ![Multi-threading](runtime_comparison_concurrency.png)
 
-A lack of parallelization gain beyond a concurrency `6` would indicate a limitation of the SMT architecture for IO-bound application ?
+A lack of parallelization gain beyond a concurrency `6` would indicate a limitation of the SMT architecture for IO heavy application.
 
 
 ## Best practices
@@ -72,7 +78,7 @@ Multi-threading leverages multi-core processor, effectively dividing the load ac
 
 ### Scan the stream once
 
-Iterating through byte array is an expensive operation. To avoid re-scanning parts of the sequence, the parser should precompute all the necesary values in the first pass. The city name needs the byte array, length and hash key. The temperature needs the sign, the integer part and the fractional part of the floating number. For example when scanning the digits that make up the integer part, the parser needs to traverse them in reverse order. It can then reduce the sequence of digits in base 10 into a sum.
+Iterating through byte array is an expensive operation. To avoid re-scanning parts of the sequence, the parser should precompute all the necesary values in the first pass. The city name needs the *byte array*, *length* and *hash key*. The temperature needs the *sign*, the *integer part* and the *fractional part* of the floating number.
 
 ### Reuse objects
 
@@ -80,14 +86,14 @@ Creating a new Object for each row over a 1B dataset causes high memory pressure
 
 ### Use MMap
 
-Large portions of the file (up to 2 GB) can be memory-mapped. This OS feature provides a convenient abstraction for the parser. It can then read the stream sequentially, as if it was accessing a single buffer like an array in memory. The OS takes care of buffering. It saves the application from reading bytes by batch of fixed size, having to figure out the start offset of the first full line, the end offset of the last full line and stitch together the lines overlapping with the previous or the next batch.
+Large portions of the file can be memory-mapped. The max size of a portion that the JVM can memory-map is 2 GB. This OS feature provides a convenient abstraction for the parser, allowing it to read the stream sequentially, as if it was accessing a single buffer like an array in memory. The OS instead takes care of buffering. It saves the application from reading bytes by batch of fixed size, having to figure out the start offset of the first full line, the end offset of the last full line and stitch together the lines overlapping with the previous or the next batch.
 
 ### To be continued
 
 
 ## CPU profile
 
-Looking at the flame graph, CPU time breaks down into the main operations
+Looking at the CPU sampling and the flame graph, the main hotspots are
 
 | Step | Operation | method |
 | --- | --- | --- |
@@ -95,4 +101,11 @@ Looking at the flame graph, CPU time breaks down into the main operations
 2 | parsing the temperature value | `parseDouble`
 3 | looking up the city name in the hash map | `HashMap.get`
 
+![CPU Profile](./cpu_profile.png)
+
 ![Flame Graph](./flamegraph_cpu.png)
+
+
+# Conclusion
+
+This challenge [Gunnar Morling](https://twitter.com/gunnarmorling) initiated in the Java community is an amazing learning experience for both junior and senior Java developers, looking to hone their own skills in system performance.
