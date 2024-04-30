@@ -18,7 +18,7 @@ public class CalculateAverage {
     }
 
     public void parse(final File file, final OutputStream outputStream) throws IOException {
-        final StationFileParser stationFileParser = new MMapConcurrentParser(1);
+        final StationFileParser stationFileParser = new MMapConcurrentParser(6);
 
         final StationInput stationInput = new StationInput(file);
         final StationOutput stationOutput = stationFileParser.parse(stationInput);

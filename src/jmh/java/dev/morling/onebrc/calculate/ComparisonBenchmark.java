@@ -8,7 +8,6 @@ import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Mode;
-import org.openjdk.jmh.annotations.Param;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.Warmup;
@@ -22,7 +21,7 @@ import dev.morling.onebrc.model.StationInput;
 @Warmup(iterations=0)
 @Measurement(iterations=1)
 @State(Scope.Benchmark)
-public class ComparativeBenchmark {
+public class ComparisonBenchmark {
     private static final String FILE_PATH = "data/measurements_1B.csv";
 
     private final StationInput stationInput = new StationInput(new File(FILE_PATH));
@@ -46,13 +45,13 @@ public class ComparativeBenchmark {
 
     @Benchmark
     public void byteBuffer1() throws IOException {
-        final StationFileParser stationFileParser = new ByteBufferParser(1);
+        final StationFileParser stationFileParser = new ByteBufferConcurrentParser(1);
         stationFileParser.parse(stationInput);
     }
 
     @Benchmark
     public void byteBuffer6() throws IOException {
-        final StationFileParser stationFileParser = new ByteBufferParser(6);
+        final StationFileParser stationFileParser = new ByteBufferConcurrentParser(6);
         stationFileParser.parse(stationInput);
     }
 

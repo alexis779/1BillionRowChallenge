@@ -56,5 +56,5 @@ test {
 }
 
 jmh {
-	includes = [ 'ComparativeBenchmark' ]
+	includes = [ 'ConcurrencyBenchmark' ]
 }

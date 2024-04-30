@@ -3,7 +3,7 @@ package dev.morling.onebrc.calculate;
 import java.nio.ByteBuffer;
 
 import dev.morling.onebrc.model.BaseInteger;
-import dev.morling.onebrc.model.ByteArrayHashKey;
+import dev.morling.onebrc.model.LongArrayHashKey;
 import dev.morling.onebrc.model.StationTemperature;
 
 public class StationTemperatureParser {
@@ -17,8 +17,8 @@ public class StationTemperatureParser {
     private static final int BASE = 10;
     private static final int PRIME = 31;
 
-    private final ByteArrayHashKey byteArrayHashKey = new ByteArrayHashKey();
-    private final StationTemperature stationTemperature = new StationTemperature(byteArrayHashKey);
+    private final LongArrayHashKey longArrayHashKey = new LongArrayHashKey();
+    private final StationTemperature stationTemperature = new StationTemperature(longArrayHashKey);
     private final BaseInteger baseInteger = new BaseInteger();
 
     private final ByteBuffer byteBuffer;
@@ -38,7 +38,7 @@ public class StationTemperatureParser {
 
     private void parseLine() {
         parseStationName();
-        stationTemperature.stationHashKey(byteArrayHashKey);
+        stationTemperature.stationHashKey(longArrayHashKey);
 
         final double temperature = parseDouble();
         stationTemperature.temperature(temperature);
@@ -48,24 +48,47 @@ public class StationTemperatureParser {
     }
 
     private void parseStationName() {
-        // parse station name
-        int start = byteBuffer.position();
+        final int start = byteBuffer.position();
 
-        // compute rolling hash while scanning
-        int hash = 1;
+        // rolling hash
+        int hashCode = 1;
+
+        // long buffer
+        final long[] key = longArrayHashKey.key();
+        // number of longs so far
+        int longPosition = 0;
+        // long being currently loaded
+        long longCurrent = 0;
+        // byte index in the long
+        int j = 0;
+
         byte current;
         while (byteBuffer.hasRemaining() && (current = byteBuffer.get()) != SEMI_COLON) {
-            hash = PRIME * hash + current;
+            hashCode = PRIME * hashCode + current;
+
+            // apply bit mask, since negative values will have 1's on the left of the binary representation of the byte
+            final long b = current & 0xFFL;
+            final int shiftBits = j * LongArrayHashKey.BITS_IN_BYTE;
+            longCurrent |= b << shiftBits;
+            j++;
+
+            if (j == LongArrayHashKey.BYTES_IN_LONG) {
+                key[longPosition++] = longCurrent;
+                longCurrent = 0;
+                j = 0;
+            }
         }
-        byteArrayHashKey.hashCode(hash);
+        if (longCurrent != 0) {
+            key[longPosition] = longCurrent;
+        }
 
-        int length = byteBuffer.position()-1 - start;
-        byteArrayHashKey.length(length);
+        longArrayHashKey.hashCode(hashCode);
 
-        // load slice from buffer into the byte array
-        byteBuffer.get(start, byteArrayHashKey.key(), 0, length);
+        final int length = byteBuffer.position()-1 - start;
+        longArrayHashKey.length(length);
 
-        byteArrayHashKey.resetName();
+        // invalidate stale value in cache
+        longArrayHashKey.resetName();
     }
 
     private double parseDouble() {

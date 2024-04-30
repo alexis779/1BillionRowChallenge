@@ -17,8 +17,8 @@ public class ByteArrayHashKey implements StationKey {
         key = new byte[LENGTH];
     }
 
-    public ByteArrayHashKey(final ByteArrayHashKey byteArrayHashKey) {
-        key = new byte[LENGTH];
+    private ByteArrayHashKey(final ByteArrayHashKey byteArrayHashKey) {
+        this();
         System.arraycopy(byteArrayHashKey.key, 0, key, 0, byteArrayHashKey.length);
         this.length = byteArrayHashKey.length;
         this.hashCode = byteArrayHashKey.hashCode;
