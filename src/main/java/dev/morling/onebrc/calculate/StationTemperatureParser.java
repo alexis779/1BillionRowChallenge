@@ -15,11 +15,10 @@ public class StationTemperatureParser {
 
     private static final int BASE = 10;
     /**
-     * Max int is 2^31, 2 GB.
-     * So the max int number will by 2*10^9 in it's base-10 decomposition.
-     * We need a long because a first digit > 2 would overflow an int
+     * Max number in base 10 supported on 32 bits is 999 999 999.
+     * Adding another 9 digit would overflow 4 GB = 2 ** 32
      */
-    private static final long MAX_POW = 1_000_000_000; // 10^9
+    private static final int MAX_POW = 100_000_000; // 10^8
     private static final int PRIME = 31;
 
     private final LongArrayHashKey longArrayHashKey = new LongArrayHashKey();
@@ -67,11 +66,12 @@ public class StationTemperatureParser {
         int j = 0;
 
         byte current;
+        int shiftBits = 0;
         while ((current = byteBuffer.get()) != SEMI_COLON) {
             // apply bit mask, since negative values will have 1's on the left of the binary representation of the byte
             final long b = current & 0xFFL;
-            final int shiftBits = j * LongArrayHashKey.BITS_IN_BYTE;
             longCurrent |= b << shiftBits;
+            shiftBits += LongArrayHashKey.BITS_IN_BYTE;
             j++;
 
             if (j == LongArrayHashKey.BYTES_IN_LONG) {
@@ -79,6 +79,7 @@ public class StationTemperatureParser {
                 hashCode = updateHashCode(hashCode, longCurrent);
                 longCurrent = 0;
                 j = 0;
+                shiftBits = 0;
             }
         }
         if (longCurrent != 0) {
@@ -90,9 +91,6 @@ public class StationTemperatureParser {
 
         final int length = byteBuffer.position()-1 - start;
         longArrayHashKey.length(length);
-
-        // invalidate stale value in cache
-        longArrayHashKey.resetName();
     }
 
     private long updateHashCode(final long hashCode, final long current) {
@@ -110,16 +108,18 @@ public class StationTemperatureParser {
     }
 
     private int parseInt() {
-        long sum = 0;
-        long pow = MAX_POW;
+        int sum = 0;
+        int pow = MAX_POW;
         byte current;
         while ((current = byteBuffer.get()) != DOT) {
             final int digit = parseDigit(current);
             sum += digit * pow;
             pow /= BASE;
         }
-        sum /= (BASE * pow);
-        return (int) sum;
+        pow *= BASE;
+        // truncate the trailing 0s
+        sum /= pow;
+        return sum;
     }
 
     /**

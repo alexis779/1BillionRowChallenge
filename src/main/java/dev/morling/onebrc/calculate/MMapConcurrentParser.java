@@ -17,6 +17,11 @@ public class MMapConcurrentParser extends AbstractConcurrentParser {
         final long length = stationInput.file()
                 .length();
 
+        // TODO this simplifies implementation. Split buffer is used to find the next line within the split.
+        if (length < splitBufferSize * totalSplits) {
+            totalSplits = ceilingDivide(length, splitBufferSize);
+        }
+
         // each split should not exceed 2 GB
         final int minSplits = ceilingDivide(length, Integer.MAX_VALUE);
         final int q = ceilingDivide(minSplits, totalSplits);

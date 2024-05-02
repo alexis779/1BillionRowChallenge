@@ -1,7 +1,5 @@
 package dev.morling.onebrc.model;
 
-import java.util.Arrays;
-
 public class ByteArrayHashKey implements StationKey {
     /**
      * 1 KB
@@ -39,11 +37,16 @@ public class ByteArrayHashKey implements StationKey {
     @Override
     public boolean equals(final Object object) {
         final ByteArrayHashKey stationHashKey = (ByteArrayHashKey) object;
-        // Since hashCode and length should match, we can check those conditions first.
-        if (! (hashCode == stationHashKey.hashCode && length == stationHashKey.length)) {
-            return false;
+        return arrayEquals(key, stationHashKey.key, length);
+    }
+
+    private boolean arrayEquals(final byte[] b1, final byte[] b2, final int l) {
+        for (int i = 0; i < length; i++) {
+            if (b1[i] != b2[i]) {
+                return false;
+            }
         }
-        return Arrays.equals(key, 0, length, stationHashKey.key, 0, stationHashKey.length);
+        return true;
     }
 
     @Override

@@ -66,11 +66,16 @@ public class LongArrayHashKey implements StationKey {
     @Override
     public boolean equals(final Object object) {
         final LongArrayHashKey stationHashKey = (LongArrayHashKey) object;
-        // Since hashCode and length should match, we can check those conditions first.
-        if (! (hashCode == stationHashKey.hashCode && byteLength == stationHashKey.byteLength)) {
-            return false;
+        return arrayEquals(key, stationHashKey.key, longLength);
+    }
+
+    private boolean arrayEquals(final long[] l1, final long[] l2, final int length) {
+        for (int i = 0; i < length; i++) {
+            if (l1[i] != l2[i]) {
+                return false;
+            }
         }
-        return Arrays.equals(key, 0, longLength, stationHashKey.key, 0, longLength);
+        return true;
     }
 
     @Override
@@ -93,8 +98,8 @@ public class LongArrayHashKey implements StationKey {
     }
 
     public void length(final int byteLength) {
-        this.byteLength =  byteLength;
-        this.longLength = AbstractConcurrentParser.ceilingDivide(byteLength, BYTES_IN_LONG);
+        this.byteLength = byteLength;
+        longLength = AbstractConcurrentParser.ceilingDivide(byteLength, BYTES_IN_LONG);
     }
 
     public void resetName() {

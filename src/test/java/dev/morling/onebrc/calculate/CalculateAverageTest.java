@@ -2,6 +2,7 @@ package dev.morling.onebrc.calculate;
 
 import static dev.morling.onebrc.calculate.StationWriter.round;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -60,8 +61,10 @@ public class CalculateAverageTest {
         final Path path = Paths.get("data", "measurements_test.csv");
         final ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
-        new CalculateAverage()
-                .parse(path.toFile(), byteArrayOutputStream);
+        final int bufferSize = 50;
+        final StationFileParser stationFileParser = new MMapConcurrentParser(1, bufferSize);
+        final CalculateAverage calculateAverage = new CalculateAverage(stationFileParser);
+        calculateAverage.parse(path.toFile(), byteArrayOutputStream);
 
         final String station0 = "Vohipeno=-22.3/-19.7/-17.2";
         final String station1 = "Ōno=35.5/35.8/36.0";
@@ -110,5 +113,35 @@ public class CalculateAverageTest {
                 .parse(path.toFile(), byteArrayOutputStream);
 
         System.err.println(byteArrayOutputStream.toString());
+    }
+
+    @Test
+    public void testErrorHandling() throws IOException {
+        final Path path = Paths.get("data", "measurements_test.csv");
+        final StationInput stationInput = new StationInput(path.toFile());
+
+        final StationFileParser stationFileParser = new AbstractConcurrentParser(1, 1024) {
+
+            @Override
+            protected int adjustTotalSplits(int totalSplits, StationInput stationInput) {
+                return totalSplits;
+            }
+
+            @Override
+            protected StationFileParser createStationFileParser() {
+                return new StationFileParser() {
+
+                    @Override
+                    public StationOutput parse(StationInput input) throws IOException {
+                        throw new RuntimeException("Something went wrong");
+                    }
+
+                };
+            }
+
+        };
+
+        final StationOutput stationOutput = stationFileParser.parse(stationInput);
+        assertTrue(stationOutput.stationsMap().isEmpty());
     }
 }

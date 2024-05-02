@@ -1,6 +1,7 @@
 package dev.morling.onebrc.calculate;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -17,12 +18,12 @@ public abstract class AbstractConcurrentParser implements StationFileParser {
     /**
      * Number of worker threads.
      */
-    private int concurrency;
+    private final int concurrency;
 
     /**
-     * Size of a buffer used while splitting.
+     * Size of a buffer used to find the next end of line while splitting.
      */
-    private final int splitBufferSize;
+    protected final int splitBufferSize;
 
     public AbstractConcurrentParser(final int concurrency, final int splitBufferSize) {
         this.concurrency = concurrency;
@@ -31,6 +32,9 @@ public abstract class AbstractConcurrentParser implements StationFileParser {
 
     public static int ceilingDivide(long a, long b) {
         return (int) ((a + b - 1) / b);
+    }
+    public static int ceilingDivide(int a, int b) {
+        return (a + b - 1) / b;
     }
 
     @Override
@@ -50,30 +54,26 @@ public abstract class AbstractConcurrentParser implements StationFileParser {
             .collect(Collectors.toList());
 
         // wait for each workers to complete their task
+        final List<StationOutput> stationOutputs = new ArrayList<>();
+        for (final Future<StationOutput> future : futures) {
+            try {
+                final StationOutput stationOutput = future.get();
+                stationOutputs.add(stationOutput);
+            } catch (InterruptedException | ExecutionException e) {
+                e.printStackTrace();
+            }
+        }
+
+        executorService.shutdown();
+
         final StationStatisticsAggregator stationTemperatureAggregator = new MapStationStatisticsAggregator();
-        futures.stream()
-            .map(this::futureGet)
+        stationOutputs.stream()
             .map(StationOutput::stationsMap)
             .forEach(stationTemperatureAggregator::mergeStations);
-        
-        executorService.shutdown();
 
         return new StationOutput(stationTemperatureAggregator.stationMap());
     }
 
     protected abstract int adjustTotalSplits(final int totalSplits, final StationInput stationInput);
     protected abstract StationFileParser createStationFileParser();
-
-    private StationOutput futureGet(Future<StationOutput> future) {
-        try {
-            return future.get();
-        } catch (InterruptedException ie) {
-            ie.printStackTrace();
-            throw new RuntimeException(ie);
-        } catch (ExecutionException ee) {
-            ee.printStackTrace();
-            // TODO if a validation error happens or something goes wrong, this error is swallowed and the main thread gets stuck without throwing any error
-            throw new RuntimeException(ee);
-        }
-    }
 }
